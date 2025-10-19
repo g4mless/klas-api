@@ -26,7 +26,7 @@ function getTodayName(override?: string): string {
 }
 
 app.get('/', (c) => {
-  return c.text('Hello Hono!')
+  return c.text('Klas king!')
 })
 
 app.get("/schedule", async (c) => {
@@ -40,7 +40,7 @@ app.get("/duty", async (c) => {
 })
 
 app.get("/today-schedule", async (c) => {
-  const override = c.req.query("day");
+  const override = c.req.query("d"); //d = day
   const today = getTodayName(override);
 
   const result = await pool.query(
@@ -52,7 +52,7 @@ app.get("/today-schedule", async (c) => {
 })
 
 app.get("/today-duty", async (c) => {
-  const override = c.req.query("day");
+  const override = c.req.query("d"); //d = day
   const today = getTodayName(override);
   const result = await pool.query(
     "SELECT id, student_name FROM duty_schedule WHERE day = $1 ORDER BY id",
