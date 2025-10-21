@@ -6,23 +6,33 @@ const app = new Hono()
 
 function getTodayName(override?: string): string {
   const dayMap: Record<string, string> = {
-    Sunday: "Minggu",
-    Monday: "Senin",
-    Tuesday: "Selasa",
-    Wednesday: "Rabu",
-    Thursday: "Kamis",
-    Friday: "Jumat",
-    Saturday: "Sabtu",
-  }
+    sunday: "Minggu",
+    monday: "Senin",
+    tuesday: "Selasa",
+    wednesday: "Rabu",
+    thursday: "Kamis",
+    friday: "Jumat",
+    saturday: "Sabtu",
+    //minggu: "Minggu", in case override is broke
+    //senin: "Senin",
+    //selasa: "Selasa",
+    //rabu: "Rabu",
+    //kamis: "Kamis",
+    //jumat: "Jumat",
+    //sabtu: "Sabtu",
+  };
 
-  if (override) return dayMap[override.toLowerCase()] ?? override;
+  if (override) {
+    const key = override.toLowerCase();
+    return dayMap[key] ?? override;
+  }
 
   const today = new Date().toLocaleString("en-US", {
     timeZone: "Asia/Jakarta",
     weekday: "long",
-  })
+  }).toLowerCase();
 
-  return dayMap[today.toLowerCase()];
+  return dayMap[today] ?? today;
 }
 
 app.get('/', (c) => {
