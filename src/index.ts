@@ -1,7 +1,7 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { prettyJSON } from 'hono/pretty-json'
-import { pool } from "./db.js";
+import { supabase } from './supabaseClient.js';
 
 const app = new Hono()
 
@@ -43,25 +43,54 @@ app.get('/', (c) => {
 })
 
 app.get("/schedule", async (c) => {
-  const result = await pool.query("SELECT * FROM subjects_schedule ORDER BY id");
-  return c.json(result.rows);
+  const { data, error } = await supabase
+    .from('subjects_schedule')
+    .select('*')
+    .order('id', { ascending: true });
+
+  if (error) throw error;
+  const grouped = data.reduce((acc: any, row) => {
+    if (!acc[row.day]) acc[row.day] = [];
+    acc[row.day].push({
+      id: row.id,
+      subject: row.subject
+    });
+    return acc;
+  }, {});
+  return c.json(grouped);
 })
 
 app.get("/duty", async (c) => {
-  const result = await pool.query("SELECT * FROM duty_schedule ORDER BY id");
-  return c.json(result.rows);
+  const { data, error } = await supabase
+  .from('duty_schedule')
+  .select('*')
+  .order('id', { ascending: true });
+
+  if (error) throw error;
+  const grouped = data.reduce((acc: any, row) => {
+    if (!acc[row.day]) acc[row.day] = [];
+    acc[row.day].push({
+      id: row.id,
+      student_name: row.student_name
+    });
+    return acc;
+  }, {});
+
+  return c.json(grouped);
 })
 
 app.get("/today-schedule", async (c) => {
   const override = c.req.query("d"); //d = day
   const today = getTodayName(override);
 
-  const result = await pool.query(
-    "SELECT id, subject, start_time, end_time, teacher FROM subjects_full WHERE day = $1 ORDER BY id",
-    [today]
-  )
+  const { data, error } = await supabase
+    .from('subjects_full')
+    .select('id, subject, start_time, end_time, teacher')
+    .eq('day', today)
+    .order('id', { ascending: true });
 
-  return c.json({ today, schedule: result.rows })
+  if (error) throw error;
+  return c.json({ today, schedule: data });
 })
 
 app.get("/ongoing", async (c) => {
@@ -83,28 +112,29 @@ app.get("/ongoing", async (c) => {
     time = `${hh}:${mm}`;
   }
 
-  const result = await pool.query(
-    `SELECT id, subject, start_time, end_time, teacher
-     FROM subjects_full
-     WHERE day = $1
-       AND start_time <= $2
-       AND end_time > $2
-     ORDER BY id`,
-    [today, time]
-  );
+  const { data, error } = await supabase
+    .from('subjects_full')
+    .select('id, subject, start_time, end_time, teacher')
+    .eq('day', today)
+    .lte('start_time', time)
+    .gt('end_time', time)
+    .order('id', { ascending: true });
 
-  return c.json({ today, time, ongoing: result.rows });
+  if (error) throw error;
+  return c.json({ today, time, ongoing: data });
 });
 
 app.get("/today-duty", async (c) => {
   const override = c.req.query("d"); //d = day
   const today = getTodayName(override);
-  const result = await pool.query(
-    "SELECT id, student_name FROM duty_schedule WHERE day = $1 ORDER BY id",
-    [today]
-  );
+  const { data, error } = await supabase
+    .from('duty_schedule')
+    .select('id, student_name')
+    .eq('day', today)
+    .order('id', { ascending: true });
 
-  return c.json({ today, duty: result.rows, })
+  if (error) throw error;
+  return c.json({ today, duty: data });
 })
 
 serve({
