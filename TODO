@@ -1,0 +1,3 @@
+- use otp instead of password login
+- add admin role for modify everything on db
+- make endpoint called /your-duty that actually just to inform if the day is your duty day or not.
