@@ -1,7 +1,7 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { prettyJSON } from 'hono/pretty-json'
-import { supabase } from './supabaseClient.js';
+import { supabase, supabaseAdmin } from './supabaseClient.js';
 
 const app = new Hono()
 
@@ -136,6 +136,100 @@ app.get("/today-duty", async (c) => {
   if (error) throw error;
   return c.json({ today, duty: data });
 })
+
+// Authentication endpoints
+app.post("/auth/signup", async (c) => {
+  const { email, password } = await c.req.json();
+  if (!email || !password) {
+    return c.json({ error: "Email and password are required" }, 400);
+  }
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+  });
+
+  if (error) {
+    return c.json({ error: error.message }, 400);
+  }
+
+  return c.json({ user: data.user, session: data.session });
+});
+
+app.post("/auth/signin", async (c) => {
+  const { email, password } = await c.req.json();
+  if (!email || !password) {
+    return c.json({ error: "Email and password are required" }, 400);
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    return c.json({ error: error.message }, 400);
+  }
+
+  return c.json({ user: data.user, session: data.session });
+});
+
+app.get("/auth/user", async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json({ error: "Authorization header with Bearer token is required" }, 401);
+  }
+
+  const accessToken = authHeader.substring(7);
+  const { data, error } = await supabase.auth.getUser(accessToken);
+
+  if (error) {
+    return c.json({ error: error.message }, 400);
+  }
+
+  return c.json({ user: data.user });
+});
+
+app.post("/auth/link-student", async (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json({ error: "Authorization header with Bearer token is required" }, 401);
+  }
+
+  const accessToken = authHeader.substring(7);
+  const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
+
+  if (userError || !userData.user) {
+    return c.json({ error: "Invalid token or user not found" }, 401);
+  }
+
+  const { name } = await c.req.json();
+  if (!name) {
+    return c.json({ error: "Name is required" }, 400);
+  }
+
+  const { data: studentData, error: studentError } = await supabaseAdmin
+    .from('students')
+    .select('*')
+    .eq('name', name)
+    .single();
+
+  if (studentError || !studentData) {
+    return c.json({ error: "Student not found" }, 404);
+  }
+
+  const { data: updateData, error: updateError } = await supabaseAdmin
+    .from('students')
+    .update({ user_id: userData.user.id })
+    .eq('name', name)
+    .select();
+
+  if (updateError) {
+    return c.json({ error: updateError.message }, 400);
+  }
+
+  return c.json({ message: "Student linked successfully", student: updateData[0] });
+});
 
 serve({
   fetch: app.fetch,
