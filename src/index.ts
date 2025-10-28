@@ -139,7 +139,13 @@ app.get("/today-duty", async (c) => {
 
 // Authentication endpoints
 app.post("/auth/signin", async (c) => {
-  const { email } = await c.req.json();
+  let body;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+  const { email } = body;
   if (!email) {
     return c.json({ error: "Email is required" }, 400);
   }
@@ -156,7 +162,13 @@ app.post("/auth/signin", async (c) => {
 });
 
 app.post("/auth/verify-otp", async (c) => {
-  const { email, token } = await c.req.json();
+  let body;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+  const { email, token } = body;
   if (!email || !token) {
     return c.json({ error: "Email and token are required" }, 400);
   }
@@ -203,7 +215,13 @@ app.post("/auth/link-student", async (c) => {
     return c.json({ error: "Invalid token or user not found" }, 401);
   }
 
-  const { name } = await c.req.json();
+  let body;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+  const { name } = body;
   if (!name) {
     return c.json({ error: "Name is required" }, 400);
   }
@@ -229,6 +247,20 @@ app.post("/auth/link-student", async (c) => {
   }
 
   return c.json({ message: "Student linked successfully", student: updateData[0] });
+});
+
+app.get("/student", async (c) => {
+  const { data, error } = await supabaseAdmin
+    .from('students')
+    .select('name')
+    .is('user_id', null)
+    .order('name', { ascending: true });
+
+  if (error) {
+    return c.json({ error: error.message }, 400);
+  }
+
+  return c.json({ students: data });
 });
 
 serve({
