@@ -138,33 +138,33 @@ app.get("/today-duty", async (c) => {
 })
 
 // Authentication endpoints
-app.post("/auth/signup", async (c) => {
-  const { email, password } = await c.req.json();
-  if (!email || !password) {
-    return c.json({ error: "Email and password are required" }, 400);
+app.post("/auth/signin", async (c) => {
+  const { email } = await c.req.json();
+  if (!email) {
+    return c.json({ error: "Email is required" }, 400);
   }
 
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signInWithOtp({
     email,
-    password,
   });
 
   if (error) {
     return c.json({ error: error.message }, 400);
   }
 
-  return c.json({ user: data.user, session: data.session });
+  return c.json({ message: "OTP sent to email" });
 });
 
-app.post("/auth/signin", async (c) => {
-  const { email, password } = await c.req.json();
-  if (!email || !password) {
-    return c.json({ error: "Email and password are required" }, 400);
+app.post("/auth/verify-otp", async (c) => {
+  const { email, token } = await c.req.json();
+  if (!email || !token) {
+    return c.json({ error: "Email and token are required" }, 400);
   }
 
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.verifyOtp({
     email,
-    password,
+    token,
+    type: 'email',
   });
 
   if (error) {
