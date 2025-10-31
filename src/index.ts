@@ -161,7 +161,7 @@ app.post("/auth/signin", async (c) => {
   return c.json({ message: "OTP sent to email" });
 });
 
-app.post("/auth/verify-otp", async (c) => {
+app.post("/auth/verify", async (c) => {
   let body;
   try {
     body = await c.req.json();
