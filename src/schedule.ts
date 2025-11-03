@@ -81,7 +81,12 @@ export function setupScheduleRoutes(app: Hono) {
       .order('id', { ascending: true });
 
     if (error) throw error;
-    return c.json({ today, schedule: data });
+    const schedule = (data || []).map((row: any) => ({
+      ...row,
+      start_time: typeof row.start_time === 'string' ? row.start_time.slice(0, 5) : row.start_time,
+      end_time: typeof row.end_time === 'string' ? row.end_time.slice(0, 5) : row.end_time,
+    }));
+    return c.json({ today, schedule });
   });
 
   app.get("/ongoing", async (c) => {
@@ -112,7 +117,12 @@ export function setupScheduleRoutes(app: Hono) {
       .order('id', { ascending: true });
 
     if (error) throw error;
-    return c.json({ today, time, ongoing: data });
+    const ongoing = (data || []).map((row: any) => ({
+      ...row,
+      start_time: typeof row.start_time === 'string' ? row.start_time.slice(0, 5) : row.start_time,
+      end_time: typeof row.end_time === 'string' ? row.end_time.slice(0, 5) : row.end_time,
+    }));
+    return c.json({ today, time, ongoing });
   });
 
   app.get("/today-duty", async (c) => {
