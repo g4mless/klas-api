@@ -22,13 +22,6 @@ app.get('/', (c) => {
 })
 
 
-app.get('/students', async (c) => {
-  const { data, error } = await supabase.from('students').select('*')
-  if (error) return c.json({ error: error.message }, 400)
-  return c.json(data)
-})
-
-
 serve({
   fetch: app.fetch,
   port: 3000

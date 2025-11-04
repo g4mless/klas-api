@@ -80,4 +80,10 @@ export function setupAttendanceRoutes(app: Hono) {
 
     return c.json({ message: 'Attendance recorded', attendance: inserted?.[0] ?? null }, 201);
   });
+
+  app.get('/students', async (c) => {
+    const { data, error } = await supabase.from('students').select('*')
+    if (error) return c.json({ error: error.message }, 400)
+    return c.json(data)
+  })
 }
