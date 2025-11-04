@@ -1,5 +1,21 @@
 import { Hono } from 'hono';
-import { supabase } from './supabaseClient.js';
+import { supabase, supabaseAdmin, createSupabaseClientWithToken } from './supabaseClient.js';
+
+async function getClientForRequest(c: any) {
+  try {
+    const authHeader = c.req.header('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const { data, error } = await supabaseAdmin.auth.getUser(token);
+      if (!error && data && data.user) {
+        return createSupabaseClientWithToken(token);
+      }
+    }
+  } catch (e) {
+    // ignore err
+  }
+  return supabase;
+}
 
 function getTodayName(override?: string): string {
   const dayMap: Record<string, string> = {
@@ -34,13 +50,14 @@ function getTodayName(override?: string): string {
 
 export function setupScheduleRoutes(app: Hono) {
   app.get("/schedule", async (c) => {
-    const { data, error } = await supabase
+    const rls = await getClientForRequest(c);
+    const { data, error } = await rls
       .from('subjects_schedule')
       .select('*')
       .order('id', { ascending: true });
 
     if (error) throw error;
-    const grouped = data.reduce((acc: any, row) => {
+    const grouped = data.reduce((acc: any, row: any) => {
       if (!acc[row.day]) acc[row.day] = [];
       acc[row.day].push({
         id: row.id,
@@ -52,13 +69,14 @@ export function setupScheduleRoutes(app: Hono) {
   });
 
   app.get("/duty", async (c) => {
-    const { data, error } = await supabase
+    const rls = await getClientForRequest(c);
+    const { data, error } = await rls
     .from('duty_schedule')
     .select('*')
     .order('id', { ascending: true });
 
     if (error) throw error;
-    const grouped = data.reduce((acc: any, row) => {
+    const grouped = data.reduce((acc: any, row: any) => {
       if (!acc[row.day]) acc[row.day] = [];
       acc[row.day].push({
         id: row.id,
@@ -74,7 +92,8 @@ export function setupScheduleRoutes(app: Hono) {
     const override = c.req.query("d"); //d = day
     const today = getTodayName(override);
 
-    const { data, error } = await supabase
+    const rls = await getClientForRequest(c);
+    const { data, error } = await rls
       .from('subjects_full')
       .select('id, subject, start_time, end_time, teacher')
       .eq('day', today)
@@ -108,7 +127,8 @@ export function setupScheduleRoutes(app: Hono) {
       time = `${hh}:${mm}`;
     }
 
-    const { data, error } = await supabase
+    const rls = await getClientForRequest(c);
+    const { data, error } = await rls
       .from('subjects_full')
       .select('id, subject, start_time, end_time, teacher')
       .eq('day', today)
@@ -128,7 +148,8 @@ export function setupScheduleRoutes(app: Hono) {
   app.get("/today-duty", async (c) => {
     const override = c.req.query("d"); //d = day
     const today = getTodayName(override);
-    const { data, error } = await supabase
+    const rls = await getClientForRequest(c);
+    const { data, error } = await rls
       .from('duty_schedule')
       .select('id, student_name')
       .eq('day', today)
