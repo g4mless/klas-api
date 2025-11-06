@@ -112,4 +112,39 @@ export function setupAuthRoutes(app: Hono) {
 
     return c.json({ message: "Student linked successfully", student: updateData[0] });
   });
+
+  app.get("/auth/admin", async (c) => {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ error: "Authorization header with Bearer token is required" }, 401);
+    }
+
+    const accessToken = authHeader.substring(7);
+    const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
+
+    if (userError || !userData.user) {
+      return c.json({ error: "Invalid token or user not found" }, 401);
+    }
+    
+    const { data: studentData, error: studentError } = await supabaseAdmin
+      .from('students')
+      .select('id')
+      .eq('user_id', userData.user.id)
+      .single();
+
+    if (!studentError && studentData && (studentData as any).id) {
+      const studentId = (studentData as any).id;
+      const { data: adminByStudent, error: adminByStudentError } = await supabaseAdmin
+        .from('admin')
+        .select('*')
+        .eq('admin', studentId)
+        .single();
+
+      if (!adminByStudentError && adminByStudent) {
+        return c.text("you're an admin");
+      }
+    }
+
+    return c.text("not admin");
+  });
 }
