@@ -4,6 +4,7 @@ import { prettyJSON } from 'hono/pretty-json'
 import { cors } from 'hono/cors';
 import { setupScheduleRoutes } from './schedule.js';
 import { setupAuthRoutes } from './auth.js';
+import { setupAdminRoutes } from './admin.js';
 import { setupAttendanceRoutes } from './attendances.js';
 
 const app = new Hono()
@@ -15,6 +16,7 @@ app.use('*', cors())
 setupScheduleRoutes(app);
 setupAuthRoutes(app); // just for testing, later on android development will use supabase client directly
 setupAttendanceRoutes(app);
+setupAdminRoutes(app);
 
 app.get('/', (c) => {
   return c.text('Klas king!')
