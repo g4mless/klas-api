@@ -26,3 +26,4 @@ lerna-debug.log*
 
 # misc
 .DS_Store
+ANDROID_AUTH_ATTENDANCE_PLAN.md

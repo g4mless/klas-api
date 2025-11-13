@@ -20,7 +20,7 @@ Foreign keys: none
 4.students
 
 Primary key: id
-Columns: id (bigint, identity), name (text), user_id (uuid), last_status (text), last_date (date)
+Columns: id (bigint, identity), name (text), user_id (uuid), last_status (text), last_date (date), nomor_absen (int4)
 Foreign keys:
     students_user_id_fkey: public.students.user_id → auth.users.id
 

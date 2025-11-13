@@ -1,6 +1,5 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
-import { prettyJSON } from 'hono/pretty-json'
 import { cors } from 'hono/cors';
 import { setupScheduleRoutes } from './schedule.js';
 import { setupAuthRoutes } from './auth.js';
@@ -9,7 +8,6 @@ import { setupAttendanceRoutes } from './attendances.js';
 
 const app = new Hono()
 
-app.use('*', prettyJSON())
 app.use('*', cors())
 
 // Setup routes
