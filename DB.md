@@ -5,18 +5,6 @@ Columns: id (integer, identity), day (text), student_name (text), student_id (bi
 Foreign keys:
     duty_schedule_student_id_fkey: public.duty_schedule.student_id → public.students.id
 
-2.subjects_full
-
-Primary key: id
-Columns: id (integer, identity), day (text), start_time (time), end_time (time), subject (text), teacher (text)
-Foreign keys: none
-
-3.subjects_schedule
-
-Primary key: id
-Columns: id (integer, default nextval from subjects_schedule_id_seq), day (text), subject (text)
-Foreign keys: none
-
 4.students
 
 Primary key: id
