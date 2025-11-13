@@ -66,6 +66,33 @@ export function setupAuthRoutes(app: Hono) {
     return c.json({ user: data.user });
   });
 
+  app.post("/auth/refresh", async (c) => {
+    let body;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: "Invalid JSON body" }, 400);
+    }
+
+    const { refresh_token } = body;
+    if (!refresh_token) {
+      return c.json({ error: "Refresh token is required" }, 400);
+    }
+
+    const { data, error } = await supabase.auth.refreshSession({ refresh_token });
+
+    if (error) {
+      return c.json({ error: error.message }, 401);
+    }
+
+    return c.json({
+      access_token: data.session?.access_token,
+      refresh_token: data.session?.refresh_token,
+      user: data.user,
+    });
+  });
+
+
   app.post("/auth/link-student", async (c) => {
     const authHeader = c.req.header('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
