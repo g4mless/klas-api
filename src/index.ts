@@ -13,7 +13,7 @@ app.use('*', prettyJSON())
 app.use('*', cors())
 
 // Setup routes
-//setupScheduleRoutes(app);
+setupScheduleRoutes(app);
 setupAuthRoutes(app); // just for testing, later on android development will use supabase client directly
 setupAttendanceRoutes(app);
 setupAdminRoutes(app);
