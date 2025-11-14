@@ -5,10 +5,9 @@ import jwt from 'jsonwebtoken';
 
 const ALLOWED_TABLES = [
   'duty_schedule',
-  'subjects_full',
-  'subjects_schedule',
   'students',
   'attendances',
+  'class',
   'admin',
 ] as const;
 
