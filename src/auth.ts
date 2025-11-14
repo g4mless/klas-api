@@ -26,28 +26,29 @@ export function setupAuthRoutes(app: Hono) {
   });
 
   app.post("/auth/verify", async (c) => {
-    let body;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: "Invalid JSON body" }, 400);
-    }
+    const body = await c.req.json();
     const { email, token } = body;
-    if (!email || !token) {
-      return c.json({ error: "Email and token are required" }, 400);
-    }
 
     const { data, error } = await supabase.auth.verifyOtp({
       email,
       token,
-      type: 'email',
+      type: "email",
     });
 
-    if (error) {
-      return c.json({ error: error.message }, 400);
+    if (error) return c.json({ error: error.message }, 400);
+    if (!data.session) {
+      return c.json({ error: "Session not created" }, 400);
     }
 
-    return c.json({ user: data.user, session: data.session });
+    c.header(
+      "Set-Cookie",
+      `refresh_token=${data.session.refresh_token}; HttpOnly; Path=/; Secure; SameSite=Strict`
+    );
+
+    return c.json({
+      access_token: data.session.access_token,
+      user: data.user,
+    });
   });
 
   app.get("/auth/user", async (c) => {
@@ -67,27 +68,27 @@ export function setupAuthRoutes(app: Hono) {
   });
 
   app.post("/auth/refresh", async (c) => {
-    let body;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ error: "Invalid JSON body" }, 400);
-    }
-
+    const body = await c.req.json();
     const { refresh_token } = body;
-    if (!refresh_token) {
-      return c.json({ error: "Refresh token is required" }, 400);
+
+    const { data, error } = await supabase.auth.refreshSession({
+      refresh_token,
+    });
+
+    if (error) return c.json({ error: error.message }, 401);
+    if (!data.session) {
+      return c.json({ error: "Session not created" }, 400);
     }
 
-    const { data, error } = await supabase.auth.refreshSession({ refresh_token });
+    const newRefresh = data.session.refresh_token;
 
-    if (error) {
-      return c.json({ error: error.message }, 401);
-    }
+    c.header(
+      "Set-Cookie",
+      `refresh_token=${newRefresh}; HttpOnly; Path=/; Secure; SameSite=Strict`
+    );
 
     return c.json({
-      access_token: data.session?.access_token,
-      refresh_token: data.session?.refresh_token,
+      access_token: data.session.access_token,
       user: data.user,
     });
   });
