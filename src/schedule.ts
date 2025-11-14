@@ -53,7 +53,7 @@ export function setupScheduleRoutes(app: Hono) {
     const rls = await getClientForRequest(c);
     const { data, error } = await rls
     .from('duty_schedule')
-    .select('*')
+    .select('id, day, student_id, students(nama)')
     .order('id', { ascending: true });
 
     if (error) throw error;
@@ -61,7 +61,8 @@ export function setupScheduleRoutes(app: Hono) {
       if (!acc[row.day]) acc[row.day] = [];
       acc[row.day].push({
         id: row.id,
-        student_name: row.student_name
+        student_id: row.student_id,
+        nama: row.students?.nama
       });
       return acc;
     }, {});
@@ -75,7 +76,7 @@ export function setupScheduleRoutes(app: Hono) {
     const rls = await getClientForRequest(c);
     const { data, error } = await rls
       .from('duty_schedule')
-      .select('id, student_name')
+      .select('id, student_id, students(nama)')
       .eq('day', today)
       .order('id', { ascending: true });
 
