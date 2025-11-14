@@ -44,53 +44,16 @@ async function isAdminToken(token: string): Promise<boolean> {
 
   console.log('User ID from token:', userId);
 
-  // Check if the user is linked to a student and that student id appears in admin table
-  const { data: studentData, error: studentError } = await supabaseAdmin
-    .from('students')
-    .select('id')
+  // Check if the user_id exists in admin table
+  const { data: adminData, error: adminError } = await supabaseAdmin
+    .from('admin')
+    .select('*')
     .eq('user_id', userId)
     .single();
 
-  if (!studentError && studentData) {
-    console.log('Found student data:', studentData);
-    const studentId = (studentData as any).id;
-    const { data: adminData, error: adminError } = await supabaseAdmin
-      .from('admin')
-      .select('*')
-      .eq('admin', studentId)
-      .single();
-
-    if (!adminError && adminData) {
-      console.log('User is admin via student link');
-      return true;
-    }
-  }
-
-  // Fallback: check by auth user id (string)
-  const { data: adminByUserId, error: adminByUserIdError } = await supabaseAdmin
-    .from('admin')
-    .select('*')
-    .eq('admin', userId)
-    .single();
-
-  if (!adminByUserIdError && adminByUserId) {
-    console.log('User is admin via direct user ID');
+  if (!adminError && adminData) {
+    console.log('User is admin - found in admin table');
     return true;
-  }
-
-  // Final fallback: numeric parse (for legacy data)
-  const parsed = Number(userId);
-  if (!Number.isNaN(parsed)) {
-    const { data: adminByNumber, error: adminByNumberError } = await supabaseAdmin
-      .from('admin')
-      .select('*')
-      .eq('admin', parsed)
-      .single();
-
-    if (!adminByNumberError && adminByNumber) {
-      console.log('User is admin via numeric ID');
-      return true;
-    }
   }
 
   console.log('User is not admin');

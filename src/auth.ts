@@ -153,23 +153,14 @@ export function setupAuthRoutes(app: Hono) {
       return c.json({ error: "Invalid token or user not found" }, 401);
     }
     
-    const { data: studentData, error: studentError } = await supabaseAdmin
-      .from('students')
-      .select('id')
+    const { data: adminData, error: adminError } = await supabaseAdmin
+      .from('admin')
+      .select('*')
       .eq('user_id', userData.user.id)
       .single();
 
-    if (!studentError && studentData && (studentData as any).id) {
-      const studentId = (studentData as any).id;
-      const { data: adminByStudent, error: adminByStudentError } = await supabaseAdmin
-        .from('admin')
-        .select('*')
-        .eq('admin', studentId)
-        .single();
-
-      if (!adminByStudentError && adminByStudent) {
-        return c.text("you're an admin");
-      }
+    if (!adminError && adminData) {
+      return c.text("you're an admin");
     }
 
     return c.text("not admin");
