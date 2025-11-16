@@ -1,7 +1,6 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors';
-import { setupScheduleRoutes } from './schedule.js';
 import { setupAuthRoutes } from './auth.js';
 import { setupAdminRoutes } from './admin.js';
 import { setupAttendanceRoutes } from './attendances.js';
@@ -11,8 +10,7 @@ const app = new Hono()
 app.use('*', cors())
 
 // Setup routes
-setupScheduleRoutes(app);
-setupAuthRoutes(app); // just for testing, later on android development will use supabase client directly
+setupAuthRoutes(app);
 setupAttendanceRoutes(app);
 setupAdminRoutes(app);
 
