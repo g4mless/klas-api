@@ -121,7 +121,7 @@ export function setupAuthRoutes(app: Hono) {
     const { data: studentData, error: studentError } = await supabaseAdmin
       .from('students')
       .select('*')
-      .eq('name', name)
+      .eq('nama', name)
       .single();
 
     if (studentError || !studentData) {
@@ -131,7 +131,7 @@ export function setupAuthRoutes(app: Hono) {
     const { data: updateData, error: updateError } = await supabaseAdmin
       .from('students')
       .update({ user_id: userData.user.id })
-      .eq('name', name)
+      .eq('nama', name)
       .select();
 
     if (updateError) {

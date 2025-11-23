@@ -69,20 +69,51 @@ export function setupAttendanceRoutes(app: Hono) {
 
     if (insertError) return c.json({ error: insertError.message }, 500);
 
-    const { error: updateError } = await supabase
-      .from('students')
-      .update({ last_status: statusUpper, last_date: today })
-      .eq('id', studentData.id);
-    if (updateError) {
-      // non-fatal
-      return c.json({ message: 'Attendance recorded, but failed updating student cache', details: updateError.message }, 201);
-    }
-
     return c.json({ message: 'Attendance recorded', attendance: inserted?.[0] ?? null }, 201);
   });
 
+  app.get('/today-status', async (c) => {
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ error: "Authorization header with Bearer token is required" }, 401);
+    }
+    const accessToken = authHeader.substring(7);
+
+    const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(accessToken);
+    if (userError || !userData || !userData.user) {
+      return c.json({ error: "Invalid token or user not found" }, 401);
+    }
+
+    const { data: studentData, error: studentError } = await supabase
+      .from('students')
+      .select('id')
+      .eq('user_id', userData.user.id)
+      .single();
+
+    if (studentError || !studentData) {
+      return c.json({ error: "Student not linked to this user" }, 404);
+    }
+
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
+    const { data: attendance, error: attendanceError } = await supabase
+      .from('attendances')
+      .select('*')
+      .eq('student_id', studentData.id)
+      .eq('date', today)
+      .single();
+
+    if (attendanceError && attendanceError.code !== 'PGRST116') {
+      return c.json({ error: attendanceError.message }, 500);
+    }
+
+    return c.json({
+      has_attendance: !!attendance,
+      attendance: attendance ?? null
+    });
+  });
+
   app.get('/students', async (c) => {
-    const { data, error } = await supabase.from('students').select('*')
+    const { data, error } = await supabase.from('students').select('*, class(class_name)')
     if (error) return c.json({ error: error.message }, 400)
     return c.json(data)
   })
