@@ -1,5 +1,6 @@
 import { supabase, supabaseAdmin } from './supabaseClient.js';
 import { Hono } from 'hono';
+import { createErrorResponse, ErrorCodes } from './types/responses.js';
 
 export function setupAuthRoutes(app: Hono) {
   app.post("/auth/signin", async (c) => {
@@ -7,11 +8,11 @@ export function setupAuthRoutes(app: Hono) {
     try {
       body = await c.req.json();
     } catch {
-      return c.json({ error: "Invalid JSON body" }, 400);
+      return c.json(createErrorResponse(ErrorCodes.INVALID_JSON, "Invalid JSON body"), 400);
     }
     const { email } = body;
     if (!email) {
-      return c.json({ error: "Email is required" }, 400);
+      return c.json(createErrorResponse(ErrorCodes.MISSING_FIELD, "Email is required"), 400);
     }
 
     const { data, error } = await supabase.auth.signInWithOtp({
@@ -19,7 +20,7 @@ export function setupAuthRoutes(app: Hono) {
     });
 
     if (error) {
-      return c.json({ error: error.message }, 400);
+      return c.json(createErrorResponse(ErrorCodes.UNAUTHORIZED, error.message), 400);
     }
 
     return c.json({ message: "OTP sent to email" });
@@ -35,9 +36,9 @@ export function setupAuthRoutes(app: Hono) {
       type: "email",
     });
 
-    if (error) return c.json({ error: error.message }, 400);
+    if (error) return c.json(createErrorResponse(ErrorCodes.INVALID_TOKEN, error.message), 400);
     if (!data.session) {
-      return c.json({ error: "Session not created" }, 400);
+      return c.json(createErrorResponse(ErrorCodes.INVALID_TOKEN, "Session not created"), 400);
     }
 
     c.header(
@@ -47,6 +48,8 @@ export function setupAuthRoutes(app: Hono) {
 
     return c.json({
       access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      expires_in: data.session.expires_in,
       user: data.user,
     });
   });
@@ -54,14 +57,14 @@ export function setupAuthRoutes(app: Hono) {
   app.get("/auth/user", async (c) => {
     const authHeader = c.req.header('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ error: "Authorization header with Bearer token is required" }, 401);
+      return c.json(createErrorResponse(ErrorCodes.UNAUTHORIZED, "Authorization header with Bearer token is required"), 401);
     }
 
     const accessToken = authHeader.substring(7);
     const { data, error } = await supabase.auth.getUser(accessToken);
 
     if (error) {
-      return c.json({ error: error.message }, 400);
+      return c.json(createErrorResponse(ErrorCodes.INVALID_TOKEN, error.message), 400);
     }
 
     return c.json({ user: data.user });
@@ -71,13 +74,23 @@ export function setupAuthRoutes(app: Hono) {
     const body = await c.req.json();
     const { refresh_token } = body;
 
+    if (!refresh_token) {
+      return c.json(createErrorResponse(ErrorCodes.MISSING_FIELD, "Refresh token is required"), 400);
+    }
+
     const { data, error } = await supabase.auth.refreshSession({
       refresh_token,
     });
 
-    if (error) return c.json({ error: error.message }, 401);
+    if (error) {
+      const isAlreadyUsed = error.message.includes('Already Used');
+      const message = isAlreadyUsed 
+        ? "Refresh token already used. Note: Refresh tokens are single-use only. You must store and use the NEW refresh token from each successful refresh response."
+        : error.message;
+      return c.json(createErrorResponse(ErrorCodes.INVALID_TOKEN, message), 401);
+    }
     if (!data.session) {
-      return c.json({ error: "Session not created" }, 400);
+      return c.json(createErrorResponse(ErrorCodes.INVALID_TOKEN, "Session not created"), 400);
     }
 
     const newRefresh = data.session.refresh_token;
@@ -89,6 +102,8 @@ export function setupAuthRoutes(app: Hono) {
 
     return c.json({
       access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      expires_in: data.session.expires_in,
       user: data.user,
     });
   });
@@ -97,25 +112,25 @@ export function setupAuthRoutes(app: Hono) {
   app.post("/auth/link-student", async (c) => {
     const authHeader = c.req.header('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ error: "Authorization header with Bearer token is required" }, 401);
+      return c.json(createErrorResponse(ErrorCodes.UNAUTHORIZED, "Authorization header with Bearer token is required"), 401);
     }
 
     const accessToken = authHeader.substring(7);
     const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
 
     if (userError || !userData.user) {
-      return c.json({ error: "Invalid token or user not found" }, 401);
+      return c.json(createErrorResponse(ErrorCodes.INVALID_TOKEN, "Invalid token or user not found"), 401);
     }
 
     let body;
     try {
       body = await c.req.json();
     } catch {
-      return c.json({ error: "Invalid JSON body" }, 400);
+      return c.json(createErrorResponse(ErrorCodes.INVALID_JSON, "Invalid JSON body"), 400);
     }
     const { name } = body;
     if (!name) {
-      return c.json({ error: "Name is required" }, 400);
+      return c.json(createErrorResponse(ErrorCodes.MISSING_FIELD, "Name is required"), 400);
     }
 
     const { data: studentData, error: studentError } = await supabaseAdmin
@@ -125,7 +140,7 @@ export function setupAuthRoutes(app: Hono) {
       .single();
 
     if (studentError || !studentData) {
-      return c.json({ error: "Student not found" }, 404);
+      return c.json(createErrorResponse(ErrorCodes.STUDENT_NOT_FOUND, "Student not found"), 404);
     }
 
     const { data: updateData, error: updateError } = await supabaseAdmin
@@ -135,7 +150,7 @@ export function setupAuthRoutes(app: Hono) {
       .select();
 
     if (updateError) {
-      return c.json({ error: updateError.message }, 400);
+      return c.json(createErrorResponse(ErrorCodes.NOT_FOUND, updateError.message), 400);
     }
 
     return c.json({ message: "Student linked successfully", student: updateData[0] });
@@ -144,14 +159,14 @@ export function setupAuthRoutes(app: Hono) {
   app.get("/auth/admin", async (c) => {
     const authHeader = c.req.header('Authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ error: "Authorization header with Bearer token is required" }, 401);
+      return c.json(createErrorResponse(ErrorCodes.UNAUTHORIZED, "Authorization header with Bearer token is required"), 401);
     }
 
     const accessToken = authHeader.substring(7);
     const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
 
     if (userError || !userData.user) {
-      return c.json({ error: "Invalid token or user not found" }, 401);
+      return c.json(createErrorResponse(ErrorCodes.INVALID_TOKEN, "Invalid token or user not found"), 401);
     }
     
     const { data: adminData, error: adminError } = await supabaseAdmin
@@ -161,9 +176,9 @@ export function setupAuthRoutes(app: Hono) {
       .single();
 
     if (!adminError && adminData) {
-      return c.text("you're an admin");
+      return c.json({ is_admin: true, message: "you're an admin" });
     }
 
-    return c.text("not admin");
+    return c.json({ is_admin: false, message: "not admin" });
   });
 }

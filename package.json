@@ -12,7 +12,8 @@
     "dotenv": "^17.2.3",
     "hono": "^4.10.1",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.10",

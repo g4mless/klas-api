@@ -1,0 +1,40 @@
+export interface ErrorResponse {
+  error: {
+    code: string;
+    message: string;
+    details?: any;
+  };
+}
+
+export interface SuccessResponse<T = any> {
+  data: T;
+  message?: string;
+}
+
+export const ErrorCodes = {
+  INVALID_JSON: 'INVALID_JSON',
+  MISSING_FIELD: 'MISSING_FIELD',
+  UNAUTHORIZED: 'UNAUTHORIZED',
+  INVALID_TOKEN: 'INVALID_TOKEN',
+  FORBIDDEN: 'FORBIDDEN',
+  NOT_FOUND: 'NOT_FOUND',
+  STUDENT_NOT_FOUND: 'STUDENT_NOT_FOUND',
+  STUDENT_NOT_LINKED: 'STUDENT_NOT_LINKED',
+  ATTENDANCE_ALREADY_EXISTS: 'ATTENDANCE_ALREADY_EXISTS',
+  INVALID_STATUS: 'INVALID_STATUS',
+  TABLE_NOT_ALLOWED: 'TABLE_NOT_ALLOWED',
+} as const;
+
+export function createErrorResponse(
+  code: string,
+  message: string,
+  details?: any
+): ErrorResponse {
+  return {
+    error: {
+      code,
+      message,
+      details,
+    },
+  };
+}

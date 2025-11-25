@@ -28,3 +28,4 @@ lerna-debug.log*
 .DS_Store
 ANDROID_AUTH_ATTENDANCE_PLAN.md
 .env.prod
+test-refresh.js
