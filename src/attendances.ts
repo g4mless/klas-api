@@ -3,6 +3,9 @@ import { supabase, supabaseAdmin } from './supabaseClient.js';
 import { createErrorResponse, ErrorCodes } from './types/responses.js';
 import { z } from 'zod';
 
+const AVATAR_BUCKET = process.env.STUDENT_AVATAR_BUCKET ?? 'student-avatars'
+const SIGNED_URL_TTL = Number(process.env.STUDENT_AVATAR_SIGNED_URL_TTL ?? 3600)
+
 const attendanceSchema = z.object({
   status: z.enum(['HADIR', 'IZIN', 'SAKIT', 'ALFA']),
 });
@@ -116,6 +119,30 @@ export function setupAttendanceRoutes(app: Hono) {
   app.get('/students', async (c) => {
     const { data, error } = await supabase.from('students').select('*, class(class_name)')
     if (error) return c.json({ error: error.message }, 400)
-    return c.json(data)
+
+    if (!data || data.length === 0) {
+      return c.json([])
+    }
+
+    const hydrated = await Promise.all(
+      data.map(async (student) => {
+        const avatarPath = (student as any).avatar_path as string | null | undefined
+        if (!avatarPath || !AVATAR_BUCKET) {
+          return { ...student, avatar_url: null }
+        }
+
+        const { data: signed, error: signedError } = await supabaseAdmin.storage
+          .from(AVATAR_BUCKET)
+          .createSignedUrl(avatarPath, SIGNED_URL_TTL)
+
+        if (signedError || !signed) {
+          return { ...student, avatar_url: null }
+        }
+
+        return { ...student, avatar_url: signed.signedUrl }
+      }),
+    )
+
+    return c.json(hydrated)
   })
 }

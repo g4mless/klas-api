@@ -4,6 +4,7 @@ import { cors } from 'hono/cors';
 import { setupAuthRoutes } from './auth.js';
 import { setupAdminRoutes } from './admin.js';
 import { setupAttendanceRoutes } from './attendances.js';
+import { setupStudentRoutes } from './students.js';
 
 const app = new Hono()
 
@@ -13,6 +14,7 @@ app.use('*', cors())
 setupAuthRoutes(app);
 setupAttendanceRoutes(app);
 setupAdminRoutes(app);
+setupStudentRoutes(app);
 
 app.get('/', (c) => {
   return c.text('Klas king!')

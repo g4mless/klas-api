@@ -29,3 +29,4 @@ lerna-debug.log*
 ANDROID_AUTH_ATTENDANCE_PLAN.md
 .env.prod
 test-refresh.js
+dist
