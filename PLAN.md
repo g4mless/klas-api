@@ -1,26 +1,27 @@
-# Student Android App Plan
+# Student Web App Plan
 
-This document outlines the implementation plan for the Student Android Application for the Klas API. The app will allow students to log in, view their profile, and record their daily attendance.
+This document outlines the implementation plan for the Student Web Application for the Klas API. The app will allow students to log in, view their profile, and record their daily attendance.
 
 ## 1. App Overview
 *   **Target Audience**: Students.
-*   **Platform**: Android (Kotlin).
+*   **Platform**: Web (React Router v7 with Tailwindcss preinstalled).
+*   **Backend**: Hono.js API with Supabase Authentication.
 *   **Core Features**: Authentication (Email OTP), Daily Attendance Check-in, Profile View.
 
 ## 2. Features & User Flow
 
-### 2.1. Authentication
+### 2.1. Authentication (Supabase)
 *   **Login Screen**:
     *   Input: Email Address.
-    *   Action: "Send OTP" button triggers `POST /auth/signin`.
+    *   Action: "Send OTP" button triggers `supabase.auth.signInWithOtp()` with email.
 *   **OTP Verification Screen**:
     *   Input: 6-digit OTP.
-    *   Action: "Verify" button triggers `POST /auth/verify`.
-    *   **On Success**: Save `access_token`, `refresh_token`, and `user` object securely (e.g., EncryptedSharedPreferences). Navigate to Home.
+    *   Action: "Verify" button triggers `supabase.auth.verifyOtp()` with token.
+    *   **On Success**: Supabase client handles token storage securely. Session is automatically managed. Navigate to Home.
 *   **Link Student (First Time/Registration)**:
     *   *Note*: If the user is not linked to a student record, they might need to link their account.
     *   Screen: Input Full Name.
-    *   Action: `POST /auth/link-student` with `{ "name": "..." }`.
+    *   Action: `POST /auth/link-student` with `{ "name": "..." }` (using Bearer token from Supabase session).
 
 ### 2.2. Home / Dashboard
 *   **Header**: Welcome message with Student Name.
@@ -31,7 +32,7 @@ This document outlines the implementation plan for the Student Android Applicati
 *   **Attendance Action**:
     *   Buttons/Selector: "Hadir", "Izin", "Sakit".
     *   Action: `POST /absen` with `{ "status": "..." }`.
-    *   **Feedback**: Toast message ("Attendance recorded") or Error alert.
+    *   **Feedback**: Toast notification ("Attendance recorded") or Error alert.
 
 ### 2.3. Profile
 *   **Display Info**:
@@ -44,69 +45,86 @@ This document outlines the implementation plan for the Student Android Applicati
 
 ## 3. API Integration Strategy
 
-### 3.1. Endpoints
+### 3.1. Authentication (Supabase)
+| Feature | Method | Function | Parameters |
+| :--- | :--- | :--- | :--- |
+| **Send OTP** | Async | `supabase.auth.signInWithOtp()` | `{ email: "..." }` |
+| **Verify OTP** | Async | `supabase.auth.verifyOtp()` | `{ email: "...", token: "...", type: "magiclink" }` |
+| **Get Session** | Sync | `supabase.auth.getSession()` | - |
+| **Sign Out** | Async | `supabase.auth.signOut()` | - |
+
+### 3.2. Klas API Endpoints
 | Feature | Method | Endpoint | Body/Params | Auth Required |
 | :--- | :--- | :--- | :--- | :--- |
-| **Sign In** | `POST` | `/auth/signin` | `{ "email": "..." }` | No |
-| **Verify OTP** | `POST` | `/auth/verify` | `{ "email": "...", "token": "..." }` | No |
-| **Refresh Token**| `POST` | `/auth/refresh`| `{ "refresh_token": "..." }` | No |
-| **Get User** | `GET` | `/auth/user` | - | Yes (Bearer) |
 | **Link Student** | `POST` | `/auth/link-student`| `{ "name": "..." }` | Yes (Bearer) |
 | **Attendance** | `POST` | `/absen` | `{ "status": "HADIR" }` | Yes (Bearer) |
 | **Fetch Data** | `GET` | `/students` | - | No (Public)* |
 
 *> **Note on Data Fetching**: Currently, the API only provides `GET /students` which lists **all** students. The app will need to fetch this list and filter locally by the logged-in `user_id` to find the current student's details (like `last_status`, `kelas`, etc.). Future API optimization recommended: `GET /students/me`.*
 
-### 3.2. Data Models (Kotlin)
+### 3.3. Data Models (TypeScript)
 
 **User**
-```kotlin
-data class User(
-    val id: String,
-    val email: String,
-    // ... other supabase user fields
-)
+```typescript
+interface User {
+  id: string;
+  email: string;
+  // ... other supabase user fields
+}
 ```
 
 **Student**
-```kotlin
-data class Student(
-    val id: Long,
-    val nisn: String,
-    val nama: String,
-    val kelas: Long?, // ID of class
-    val user_id: String?,
-    val last_status: String?, // 'HADIR', 'IZIN', 'SAKIT', 'ALFA'
-    val last_date: String? // 'YYYY-MM-DD'
-)
+```typescript
+interface Student {
+  id: number;
+  nisn: string;
+  nama: string;
+  jenis_kelamin: string;
+  tanggal_lahir: string; // 'YYYY-MM-DD'
+  tempat_lahir: string;
+  alamat: string;
+  kelas: number; // references class.id
+  user_id?: string; // optional link to auth user
+}
 ```
 
 **AttendanceResponse**
-```kotlin
-data class AttendanceResponse(
-    val message: String,
-    val attendance: Attendance?
-)
+```typescript
+interface AttendanceResponse {
+  message: string;
+  attendance?: Attendance;
+}
 ```
 
 ## 4. Technical Stack Recommendation
-*   **Language**: Kotlin
-*   **UI Framework**: Jetpack Compose (Material3)
-*   **Network**: Retrofit + OkHttp (for API calls) or Ktor Client.
-*   **JSON Parsing**: Kotlin Serialization or Gson/Moshi.
-*   **Async**: Coroutines + Flow.
-*   **DI**: Hilt or Koin.
-*   **Local Storage**: DataStore (Preferences) for tokens.
+*   **Frontend Framework**: React (TypeScript)
+*   **UI Framework**: Tailwind CSS or Material-UI
+*   **State Management**: React Context + Hooks or Zustand
+*   **Authentication**: Supabase Client (@supabase/supabase-js)
+*   **Network**: Fetch API or axios
+*   **JSON Parsing**: Native JSON
+*   **Async**: React hooks + async/await
+*   **Form Handling**: React Hook Form
+*   **Routing**: React Router v6
+*   **Testing**: Vitest / Jest + React Testing Library
+*   **Build Tool**: Vite
 
 ## 5. Implementation Steps
-1.  **Setup Project**: Configure Android project with dependencies.
-2.  **Network Layer**: Create Retrofit service interface matching the endpoints above. Implement AuthInterceptor to inject Bearer token.
-3.  **Auth Flow**: Implement Login and Verify screens. Handle token storage.
-4.  **Student Context**: After login, fetch `GET /students` and find the matching student by `user_id`. Store `student_id` and details in session state (ViewModel).
+1.  **Setup Project**: Create React + TypeScript project using Vite or Create React App.
+2.  **Initialize Supabase**: Set up Supabase client with project URL and anon key. Create authentication context for managing session state.
+3.  **Network Layer**: Create API client module with functions for Klas API endpoints. Use Supabase session token for Bearer authentication.
+4.  **Auth Flow**: Build Login and OTP Verification pages using Supabase client methods.
+    *   Handle OTP sending: `supabase.auth.signInWithOtp({ email })`
+    *   Handle OTP verification: `supabase.auth.verifyOtp({ email, token })`
+    *   Persist session with Supabase's built-in session management.
+5.  **Student Context**: After successful authentication, fetch `GET /students` and find the matching student by `user_id`. Store student data in React Context/State.
     *   *If no student found*: Prompt user to "Link Account" (Enter Name -> `POST /auth/link-student`).
-5.  **Home Screen**: Build UI to display status. Wire up `POST /absen`.
-6.  **Error Handling**: Handle 401 (Logout/Refresh), 409 (Already Checked In), 400 (Bad Request).
+6.  **Home Screen**: Build dashboard UI to display status. Wire up attendance submission with `POST /absen`.
+7.  **Profile Page**: Display student information fetched from context.
+8.  **Error Handling**: Handle authentication errors, 409 (Already Checked In), 400 (Bad Request). Implement error boundaries.
+9.  **Responsive Design**: Ensure mobile-friendly design for web access on phones/tablets.
 
 ## 6. Future Improvements (Backend)
 *   Add `GET /students/me` endpoint to avoid fetching the entire student database on the client.
 *   Add `GET /attendances/history` to allow students to see their past records.
+*   Implement password-less authentication flow optimization.
