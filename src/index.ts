@@ -5,6 +5,7 @@ import { setupAuthRoutes } from './auth.js';
 import { setupAdminRoutes } from './admin.js';
 import { setupAttendanceRoutes } from './attendances.js';
 import { setupStudentRoutes } from './students.js';
+import { setupTeacherRoutes } from './teachers.js';
 
 const app = new Hono()
 
@@ -15,6 +16,7 @@ setupAuthRoutes(app);
 setupAttendanceRoutes(app);
 setupAdminRoutes(app);
 setupStudentRoutes(app);
+setupTeacherRoutes(app);
 
 app.get('/', (c) => {
   return c.text('Klas king!')
