@@ -1,0 +1,1 @@
+- you always must use bahasa indonesia for chat

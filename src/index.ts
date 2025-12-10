@@ -25,7 +25,10 @@ app.get('/', (c) => {
 
 serve({
   fetch: app.fetch,
-  port: 3000
+  port: 3000,
+  hostname: '0.0.0.0'
 }, (info) => {
   console.log(`Server is running on http://localhost:${info.port}`)
 })
+
+//droid --resume 36a7811f-cdc1-4738-93fc-314f96011cf9

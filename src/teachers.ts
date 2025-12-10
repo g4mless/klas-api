@@ -1,9 +1,11 @@
 import { Hono } from 'hono'
 import { supabase, supabaseAdmin } from './supabaseClient.js'
 import { createErrorResponse, ErrorCodes } from './types/responses.js'
+import jwt from 'jsonwebtoken';
 
 const AVATAR_BUCKET = process.env.STUDENT_AVATAR_BUCKET ?? 'student-avatars'
 const SIGNED_URL_TTL = Number(process.env.STUDENT_AVATAR_SIGNED_URL_TTL ?? 3600)
+const QR_SECRET = process.env.SUPABASE_JWT_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'default-secret';
 
 async function getTeacherFromToken(accessToken: string) {
   const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(accessToken)
@@ -53,6 +55,41 @@ export function setupTeacherRoutes(app: Hono) {
 
   const teacherGroup = new Hono()
   teacherGroup.use('*', ensureTeacher)
+
+  // Generate QR Token
+  teacherGroup.post('/qr/generate', async (c) => {
+    let body;
+    try {
+        body = await c.req.json();
+    } catch {
+        return c.json(createErrorResponse(ErrorCodes.INVALID_JSON, "Invalid JSON body"), 400);
+    }
+    const { class_id } = body;
+    if (!class_id) {
+        return c.json(createErrorResponse(ErrorCodes.MISSING_FIELD, "class_id is required"), 400);
+    }
+
+    const teacher = c.get('teacher') as any;
+
+    // Create a stateless signed token
+    // Payload contains class_id and teacher info, timestamp, and a nonce (optional but good for uniqueness if needed)
+    // Expires in 60 seconds (short lived)
+    const payload = {
+        type: 'qr-attendance',
+        class_id: class_id,
+        teacher_id: teacher.id,
+        generated_at: Date.now(),
+        nonce: Math.random().toString(36).substring(7)
+    };
+
+    const token = jwt.sign(payload, QR_SECRET, { expiresIn: '60s' });
+
+    return c.json({
+        token: token,
+        expires_in: 60,
+        class_id: class_id
+    });
+  });
 
   // Get all classes
   teacherGroup.get('/classes', async (c) => {
