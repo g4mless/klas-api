@@ -53,7 +53,7 @@ export function setupTeacherRoutes(app: Hono) {
     await next()
   }
 
-  const teacherGroup = new Hono()
+  const teacherGroup = new Hono<{ Variables: { teacher: any } }>()
   teacherGroup.use('*', ensureTeacher)
 
   // Generate QR Token
@@ -69,7 +69,7 @@ export function setupTeacherRoutes(app: Hono) {
         return c.json(createErrorResponse(ErrorCodes.MISSING_FIELD, "class_id is required"), 400);
     }
 
-    const teacher = c.get('teacher') as any;
+    const teacher = c.get('teacher');
 
     // Create a stateless signed token
     // Payload contains class_id and teacher info, timestamp, and a nonce (optional but good for uniqueness if needed)
