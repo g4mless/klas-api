@@ -98,6 +98,114 @@ export function setupTeacherRoutes(app: Hono) {
     return c.json(data)
   })
 
+  // Mark missing attendances as ALFA
+  teacherGroup.post('/attendances/mark-alfa', async (c) => {
+    let body
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json(createErrorResponse(ErrorCodes.INVALID_JSON, 'Invalid JSON body'), 400)
+    }
+
+    const { class_id, student_ids, date } = body ?? {}
+    if (!class_id) {
+      return c.json(createErrorResponse(ErrorCodes.MISSING_FIELD, 'class_id is required'), 400)
+    }
+
+    const targetDate =
+      typeof date === 'string' && date.length > 0
+        ? date
+        : new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date())
+
+    const { data: students, error: studentsError } = await supabase
+      .from('students')
+      .select('id, kelas')
+      .eq('kelas', class_id)
+
+    if (studentsError) {
+      return c.json(createErrorResponse(ErrorCodes.NOT_FOUND, studentsError.message), 500)
+    }
+
+    if (!students || students.length === 0) {
+      return c.json(
+        createErrorResponse(ErrorCodes.NOT_FOUND, 'No students found for the given class'),
+        404,
+      )
+    }
+
+    let filteredStudents = students
+    if (Array.isArray(student_ids) && student_ids.length > 0) {
+      const requestedIds = new Set(
+        student_ids
+          .map((id: any) => {
+            const parsed = Number(id)
+            return Number.isNaN(parsed) ? null : parsed
+          })
+          .filter((id: number | null): id is number => id !== null),
+      )
+      filteredStudents = students.filter((student) => requestedIds.has(Number(student.id)))
+
+      if (filteredStudents.length === 0) {
+        return c.json(
+          createErrorResponse(ErrorCodes.NOT_FOUND, 'Provided student_ids are not in this class'),
+          404,
+        )
+      }
+    }
+
+    const studentIds = filteredStudents.map((s) => s.id)
+    if (studentIds.length === 0) {
+      return c.json(
+        createErrorResponse(ErrorCodes.NOT_FOUND, 'No valid students found to update'),
+        404,
+      )
+    }
+
+    const { data: existingAttendances, error: existingError } = await supabase
+      .from('attendances')
+      .select('student_id')
+      .in('student_id', studentIds)
+      .eq('date', targetDate)
+
+    if (existingError) {
+      return c.json(createErrorResponse(ErrorCodes.NOT_FOUND, existingError.message), 500)
+    }
+
+    const alreadyMarkedIds = new Set(existingAttendances?.map((a) => a.student_id) ?? [])
+    const studentsToMark = filteredStudents.filter((student) => !alreadyMarkedIds.has(student.id))
+
+    if (studentsToMark.length === 0) {
+      return c.json({
+        message: 'Semua siswa sudah memiliki absensi pada tanggal tersebut',
+        inserted_count: 0,
+        student_ids: [],
+        date: targetDate,
+      })
+    }
+
+    const records = studentsToMark.map((student) => ({
+      student_id: student.id,
+      date: targetDate,
+      status: 'ALFA',
+    }))
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('attendances')
+      .insert(records)
+      .select('student_id')
+
+    if (insertError) {
+      return c.json(createErrorResponse(ErrorCodes.NOT_FOUND, insertError.message), 500)
+    }
+
+    return c.json({
+      message: 'Siswa yang belum absen berhasil ditandai sebagai ALFA',
+      inserted_count: inserted?.length ?? 0,
+      student_ids: inserted?.map((row) => row.student_id) ?? [],
+      date: targetDate,
+    })
+  })
+
   // Get today's attendance for a specific class (or all)
   teacherGroup.get('/attendances/today', async (c) => {
     const classId = c.req.query('class_id')
@@ -143,7 +251,7 @@ export function setupTeacherRoutes(app: Hono) {
                 ...s,
                 avatar_url: avatarUrl
             },
-            status: attendance ? attendance.status : 'ALPHA', // Default to ALPHA or null? Usually ALPHA if not present, or just null. Let's return null if not present so frontend decides.
+            status: attendance ? attendance.status : 'ALPHA', // Default ke ALPHA sebagai penanda belum absen
             is_present: !!attendance
         }
     }))
