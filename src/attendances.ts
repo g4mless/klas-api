@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { supabase, supabaseAdmin } from './supabaseClient.js';
+import { supabaseAdmin } from './supabaseClient.js';
 import { createErrorResponse, ErrorCodes } from './types/responses.js';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
@@ -26,7 +26,7 @@ export function setupAttendanceRoutes(app: Hono) {
       return c.json(createErrorResponse(ErrorCodes.INVALID_TOKEN, "Invalid token or user not found"), 401);
     }
 
-    const { data: studentData, error: studentError } = await supabase
+    const { data: studentData, error: studentError } = await supabaseAdmin
       .from('students')
       .select('id, kelas')
       .eq('user_id', userData.user.id)
@@ -68,7 +68,7 @@ export function setupAttendanceRoutes(app: Hono) {
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
     
     // Check existing
-    const { data: existing, error: existingError } = await supabase
+    const { data: existing, error: existingError } = await supabaseAdmin
       .from('attendances')
       .select('id')
       .eq('student_id', studentData.id)
@@ -80,7 +80,7 @@ export function setupAttendanceRoutes(app: Hono) {
       return c.json(createErrorResponse(ErrorCodes.ATTENDANCE_ALREADY_EXISTS, "Attendance already recorded for today", { date: today }), 409);
     }
 
-    const { data: inserted, error: insertError } = await supabase
+    const { data: inserted, error: insertError } = await supabaseAdmin
       .from('attendances')
       .insert([{ student_id: studentData.id, date: today, status: 'HADIR' }]) // QR Scan implies Present
       .select()
@@ -103,7 +103,7 @@ export function setupAttendanceRoutes(app: Hono) {
       return c.json(createErrorResponse(ErrorCodes.INVALID_TOKEN, "Invalid token or user not found"), 401);
     }
 
-    const { data: studentData, error: studentError } = await supabase
+    const { data: studentData, error: studentError } = await supabaseAdmin
       .from('students')
       .select('id')
       .eq('user_id', userData.user.id)
@@ -134,7 +134,7 @@ export function setupAttendanceRoutes(app: Hono) {
     }
 
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
-    const { data: existing, error: existingError } = await supabase
+    const { data: existing, error: existingError } = await supabaseAdmin
       .from('attendances')
       .select('id')
       .eq('student_id', studentData.id)
@@ -145,7 +145,7 @@ export function setupAttendanceRoutes(app: Hono) {
       return c.json(createErrorResponse(ErrorCodes.ATTENDANCE_ALREADY_EXISTS, "Attendance already recorded for today", { date: today }), 409);
     }
 
-    const { data: inserted, error: insertError } = await supabase
+    const { data: inserted, error: insertError } = await supabaseAdmin
       .from('attendances')
       .insert([{ student_id: studentData.id, date: today, status: status }])
       .select()
@@ -168,7 +168,7 @@ export function setupAttendanceRoutes(app: Hono) {
       return c.json({ error: "Invalid token or user not found" }, 401);
     }
 
-    const { data: studentData, error: studentError } = await supabase
+    const { data: studentData, error: studentError } = await supabaseAdmin
       .from('students')
       .select('id')
       .eq('user_id', userData.user.id)
@@ -179,7 +179,7 @@ export function setupAttendanceRoutes(app: Hono) {
     }
 
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date());
-    const { data: attendance, error: attendanceError } = await supabase
+    const { data: attendance, error: attendanceError } = await supabaseAdmin
       .from('attendances')
       .select('*')
       .eq('student_id', studentData.id)
@@ -197,7 +197,7 @@ export function setupAttendanceRoutes(app: Hono) {
   });
 
   app.get('/students', async (c) => {
-    const { data, error } = await supabase.from('students').select('*, class(class_name)')
+    const { data, error } = await supabaseAdmin.from('students').select('*, class(class_name)')
     if (error) return c.json({ error: error.message }, 400)
 
     if (!data || data.length === 0) {
