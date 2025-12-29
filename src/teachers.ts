@@ -5,6 +5,8 @@ import jwt from 'jsonwebtoken';
 
 const AVATAR_BUCKET = process.env.STUDENT_AVATAR_BUCKET ?? 'student-avatars'
 const SIGNED_URL_TTL = Number(process.env.STUDENT_AVATAR_SIGNED_URL_TTL ?? 3600)
+const ATTACHMENT_BUCKET = process.env.ATTENDANCE_ATTACHMENT_BUCKET ?? 'attendance-attachments'
+const ATTACHMENT_SIGNED_URL_TTL = Number(process.env.ATTENDANCE_ATTACHMENT_SIGNED_URL_TTL ?? 86400)
 const QR_SECRET = process.env.SUPABASE_JWT_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'default-secret';
 
 async function getTeacherFromToken(accessToken: string) {
@@ -32,6 +34,16 @@ async function signAvatarUrl(avatarPath: string | null) {
     .from(AVATAR_BUCKET)
     .createSignedUrl(avatarPath, SIGNED_URL_TTL)
   
+  if (error || !data) return null;
+  return data.signedUrl;
+}
+
+async function signAttachmentUrl(attachmentPath: string | null) {
+  if (!attachmentPath) return null;
+  const { data, error } = await supabaseAdmin.storage
+    .from(ATTACHMENT_BUCKET)
+    .createSignedUrl(attachmentPath, ATTACHMENT_SIGNED_URL_TTL)
+
   if (error || !data) return null;
   return data.signedUrl;
 }
@@ -258,7 +270,7 @@ export function setupTeacherRoutes(app: Hono) {
     if (studentIds.length > 0) {
         const { data: attendances, error: attendanceError } = await supabase
         .from('attendances')
-        .select('student_id, status, date')
+        .select('student_id, status, date, attachment_path')
         .in('student_id', studentIds)
         .eq('date', today)
 
@@ -273,13 +285,15 @@ export function setupTeacherRoutes(app: Hono) {
     const result = await Promise.all(students.map(async (s) => {
         const attendance = attendancesMap.get(s.id)
         const avatarUrl = await signAvatarUrl(s.avatar_path)
+        const attachmentUrl = await signAttachmentUrl(attendance?.attachment_path ?? null)
         return {
             student: {
                 ...s,
                 avatar_url: avatarUrl
             },
             status: attendance ? attendance.status : 'ALPHA', // Default ke ALPHA sebagai penanda belum absen
-            is_present: !!attendance
+            is_present: !!attendance,
+            attachment_url: attachmentUrl
         }
     }))
 
@@ -336,7 +350,14 @@ export function setupTeacherRoutes(app: Hono) {
 
     if (error) return c.json(createErrorResponse(ErrorCodes.NOT_FOUND, error.message), 500)
 
-    return c.json(data)
+    const hydrated = await Promise.all(
+      (data ?? []).map(async (row) => {
+        const attachmentUrl = await signAttachmentUrl((row as any).attachment_path ?? null)
+        return { ...row, attachment_url: attachmentUrl }
+      }),
+    )
+
+    return c.json(hydrated)
   })
 
   app.route('/teacher', teacherGroup)

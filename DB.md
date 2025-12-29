@@ -37,6 +37,8 @@ id (bigint, identity) — primary key
 student_id (bigint) — references public.students.id
 date (date)
 status (text)
+attachment_path (text)
+attachment_expires_at (timestamptz)
 Primary key: id
 Foreign keys:
 attendances_student_id_fkey: public.attendances.student_id → public.students.id
