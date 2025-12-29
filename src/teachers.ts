@@ -98,7 +98,7 @@ export function setupTeacherRoutes(app: Hono) {
     return c.json(data)
   })
 
-  // Mark missing attendances as ALFA
+  // Mark attendance as ALFA for IZIN/SAKIT or missing
   teacherGroup.post('/attendances/mark-alfa', async (c) => {
     let body
     try {
@@ -110,6 +110,9 @@ export function setupTeacherRoutes(app: Hono) {
     const { class_id, student_ids, date } = body ?? {}
     if (!class_id) {
       return c.json(createErrorResponse(ErrorCodes.MISSING_FIELD, 'class_id is required'), 400)
+    }
+    if (!Array.isArray(student_ids) || student_ids.length === 0) {
+      return c.json(createErrorResponse(ErrorCodes.MISSING_FIELD, 'student_ids is required'), 400)
     }
 
     const targetDate =
@@ -133,24 +136,21 @@ export function setupTeacherRoutes(app: Hono) {
       )
     }
 
-    let filteredStudents = students
-    if (Array.isArray(student_ids) && student_ids.length > 0) {
-      const requestedIds = new Set(
-        student_ids
-          .map((id: any) => {
-            const parsed = Number(id)
-            return Number.isNaN(parsed) ? null : parsed
-          })
-          .filter((id: number | null): id is number => id !== null),
-      )
-      filteredStudents = students.filter((student) => requestedIds.has(Number(student.id)))
+    const requestedIds = new Set(
+      student_ids
+        .map((id: any) => {
+          const parsed = Number(id)
+          return Number.isNaN(parsed) ? null : parsed
+        })
+        .filter((id: number | null): id is number => id !== null),
+    )
+    const filteredStudents = students.filter((student) => requestedIds.has(Number(student.id)))
 
-      if (filteredStudents.length === 0) {
-        return c.json(
-          createErrorResponse(ErrorCodes.NOT_FOUND, 'Provided student_ids are not in this class'),
-          404,
-        )
-      }
+    if (filteredStudents.length === 0) {
+      return c.json(
+        createErrorResponse(ErrorCodes.NOT_FOUND, 'Provided student_ids are not in this class'),
+        404,
+      )
     }
 
     const studentIds = filteredStudents.map((s) => s.id)
@@ -163,7 +163,7 @@ export function setupTeacherRoutes(app: Hono) {
 
     const { data: existingAttendances, error: existingError } = await supabase
       .from('attendances')
-      .select('student_id')
+      .select('student_id, status')
       .in('student_id', studentIds)
       .eq('date', targetDate)
 
@@ -171,37 +171,64 @@ export function setupTeacherRoutes(app: Hono) {
       return c.json(createErrorResponse(ErrorCodes.NOT_FOUND, existingError.message), 500)
     }
 
-    const alreadyMarkedIds = new Set(existingAttendances?.map((a) => a.student_id) ?? [])
-    const studentsToMark = filteredStudents.filter((student) => !alreadyMarkedIds.has(student.id))
+    const existingMap = new Map(
+      (existingAttendances ?? []).map((row) => [row.student_id, row.status]),
+    )
 
-    if (studentsToMark.length === 0) {
-      return c.json({
-        message: 'Semua siswa sudah memiliki absensi pada tanggal tersebut',
-        inserted_count: 0,
-        student_ids: [],
+    const toUpdateIds = studentIds.filter((id) => {
+      const status = existingMap.get(id)
+      return status === 'IZIN' || status === 'SAKIT'
+    })
+
+    const toInsertIds = studentIds.filter((id) => !existingMap.has(id))
+
+    let updatedIds: number[] = []
+    if (toUpdateIds.length > 0) {
+      const { data: updated, error: updateError } = await supabase
+        .from('attendances')
+        .update({ status: 'ALFA' })
+        .in('student_id', toUpdateIds)
+        .eq('date', targetDate)
+        .select('student_id')
+
+      if (updateError) {
+        return c.json(createErrorResponse(ErrorCodes.NOT_FOUND, updateError.message), 500)
+      }
+
+      updatedIds = updated?.map((row) => row.student_id) ?? []
+    }
+
+    let insertedIds: number[] = []
+    if (toInsertIds.length > 0) {
+      const records = toInsertIds.map((studentId) => ({
+        student_id: studentId,
         date: targetDate,
-      })
+        status: 'ALFA',
+      }))
+
+      const { data: inserted, error: insertError } = await supabase
+        .from('attendances')
+        .insert(records)
+        .select('student_id')
+
+      if (insertError) {
+        return c.json(createErrorResponse(ErrorCodes.NOT_FOUND, insertError.message), 500)
+      }
+
+      insertedIds = inserted?.map((row) => row.student_id) ?? []
     }
 
-    const records = studentsToMark.map((student) => ({
-      student_id: student.id,
-      date: targetDate,
-      status: 'ALFA',
-    }))
-
-    const { data: inserted, error: insertError } = await supabase
-      .from('attendances')
-      .insert(records)
-      .select('student_id')
-
-    if (insertError) {
-      return c.json(createErrorResponse(ErrorCodes.NOT_FOUND, insertError.message), 500)
-    }
+    const skippedIds = studentIds.filter(
+      (id) => !updatedIds.includes(id) && !insertedIds.includes(id),
+    )
 
     return c.json({
-      message: 'Siswa yang belum absen berhasil ditandai sebagai ALFA',
-      inserted_count: inserted?.length ?? 0,
-      student_ids: inserted?.map((row) => row.student_id) ?? [],
+      message: 'Status ALFA berhasil diterapkan',
+      updated_count: updatedIds.length,
+      inserted_count: insertedIds.length,
+      updated_student_ids: updatedIds,
+      inserted_student_ids: insertedIds,
+      skipped_student_ids: skippedIds,
       date: targetDate,
     })
   })
